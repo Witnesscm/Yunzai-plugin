@@ -5,7 +5,7 @@
 ## 食用方法
 
 - js文件放入Miao-Yunzai/plugins/example目录下
-- html文件放入Miao-Yunzai/plugins/example目录下
+- html文件夹放入Miao-Yunzai/resources目录下
 
 ## 插件列表
 
