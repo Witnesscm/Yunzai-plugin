@@ -48,7 +48,13 @@ export class dailyNoteByWidget extends plugin {
     }
 
     async note(e) {
-        let uid = e.user.getUid(e.isSr ? 'sr' : 'gs')
+        let uid
+        if (typeof e.user.getUid === 'function') {
+            uid = e.user.getUid()
+        } else { //暂时仅支持Miao-Yunzai
+            logger.mark(`${this.e.logFnc} 仅支持Miao-Yunzai`)
+            return false
+        }
         if (!uid) {
             e.reply(`未绑定${e.isSr ? '星穹铁道' : '原神'}uid`)
             return false
