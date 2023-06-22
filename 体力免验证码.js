@@ -52,11 +52,10 @@ export class dailyNoteByWidget extends plugin {
 
     async note(e) {
         let uid
-        if (typeof e.user.getUid === 'function') {
+        if (typeof e.user.getUid === 'function') { //Miao-Yunzai
             uid = e.user.getUid()
-        } else { //暂时仅支持Miao-Yunzai
-            logger.mark(`${this.e.logFnc} 仅支持Miao-Yunzai`)
-            return false
+        } else { //其他版本Yunzai，可能需要手动切换uid
+            uid = e.user.uid
         }
         if (!uid) {
             e.reply(`未绑定${e.isSr ? '星穹铁道' : '原神'}uid`)
@@ -67,8 +66,8 @@ export class dailyNoteByWidget extends plugin {
             e.reply(`未找到${e.isSr ? '星穹铁道' : '原神'}uid:${uid}绑定的stoken，请先【#扫码登陆】绑定stoken或【#uid+序号】切换uid`)
             return false
         }
-        e.uid = uid
-        e.cookie = `stuid=${sk.stuid};stoken=${sk.stoken};mid=${sk.mid};`
+        this.uid = uid
+        this.cookie = `stuid=${sk.stuid};stoken=${sk.stoken};mid=${sk.mid};`
         let headers = this.getHeaders(e.isSr)
         let res = await fetch(e.isSr ? this.srUrl : this.gsUrl, { method: "get", headers }).then(res => res.json())
         if (!res || res.retcode !== 0) return false
@@ -76,7 +75,7 @@ export class dailyNoteByWidget extends plugin {
         if (!e.isSr && xiaoyaoNote) {
             let notes = new Note(e)
             res = this.dealData(res)
-            return await notes.getNote({}, e.uid, res, { render })
+            return await notes.getNote({}, this.uid, res, { render })
         }
 
         let data = await this.getData(res)
@@ -162,8 +161,8 @@ export class dailyNoteByWidget extends plugin {
         let day = `${moment().format("MM-DD HH:mm")} ${week[moment().day()]}`
 
         return {
-            uid: this.e.uid,
-            saveId: this.e.uid,
+            uid: this.uid,
+            saveId: this.uid,
             resinMaxTime,
             coinTime,
             day,
@@ -239,8 +238,8 @@ export class dailyNoteByWidget extends plugin {
         let day = `${week[moment().day()]}`
 
         return {
-            uid: this.e.uid,
-            saveId: this.e.uid, icon, day,
+            uid: this.uid,
+            saveId: this.uid, icon, day,
             resinMaxTime, nowDay: moment(new Date()).format('YYYY年MM月DD日'),
             ...data
         }
@@ -267,7 +266,7 @@ export class dailyNoteByWidget extends plugin {
         if (res && res.retcode === 0) {
             let list = res?.data?.list || {}
             for (let i in list) {
-                if (list[i].game_uid == this.e.uid) {
+                if (list[i].game_uid == this.uid) {
                     return list[i]
                 }
             }
@@ -303,7 +302,7 @@ export class dailyNoteByWidget extends plugin {
 
     getHeaders(isSr = false) {
         return {
-            'Cookie': this.e.cookie,
+            'Cookie': this.cookie,
             "x-rpc-channel": "miyousheluodi",
             'x-rpc-device_id': DEVICE_ID,
             'x-rpc-app_version': '2.40.1',
