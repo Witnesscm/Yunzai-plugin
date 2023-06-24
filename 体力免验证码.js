@@ -25,7 +25,7 @@ import { render } from '../xiaoyao-cvs-plugin/adapter/render.js'
 // 原神使用逍遥体力模板 (派遣探索时间、周本、质变仪信息均为虚假信息)
 const xiaoyaoNote = false
 
-const mysSalt = "fdv0fY9My9eA7MR0NpjGP9RjueFvjUSQ" //k2
+const mysSalt = "yuzHvf4MkGYyoS4837hHOwLMyVOmtPuY" //k2 2.53.1
 const mysSalt2 = "t0qEgfub6cvueAPgR5m9aQWWVciEer7v" //x6
 const DEVICE_ID = randomString(32).toUpperCase()
 const DEVICE_NAME = randomString(lodash.random(1, 10))
@@ -248,8 +248,8 @@ export class dailyNoteByWidget extends plugin {
     // 赋值兼容图鉴模板
     dealData(res) {
         if (res.data.expeditions && res.data.expeditions.length >= 1) {
-            for (let i in res.data.expeditions) {
-                res.data.expeditions[i].remained_time = 3600 * 20
+            for (let item of res.data.expeditions) {
+                item.remained_time = 3600 * 20
             }
         }
         res.data.home_coin_recovery_time = (res.data.max_home_coin - res.data.current_home_coin) / 30 * 3600
@@ -265,9 +265,9 @@ export class dailyNoteByWidget extends plugin {
         let res = await fetch('https://api-takumi.miyoushe.com/binding/api/getUserGameRolesByStoken', { method: "get", headers }).then(res => res.json())
         if (res && res.retcode === 0) {
             let list = res?.data?.list || {}
-            for (let i in list) {
-                if (list[i].game_uid == this.uid) {
-                    return list[i]
+            for (let item of list) {
+                if (item.game_uid == this.uid) {
+                    return item
                 }
             }
         }
@@ -305,15 +305,16 @@ export class dailyNoteByWidget extends plugin {
             'Cookie': this.cookie,
             "x-rpc-channel": "miyousheluodi",
             'x-rpc-device_id': DEVICE_ID,
-            'x-rpc-app_version': '2.40.1',
+            'x-rpc-app_version': '2.53.1',
             "x-rpc-device_model": "Mi 10",
             'x-rpc-device_name': DEVICE_NAME,
             'x-rpc-client_type': '2',
+            'x-rpc-verify_key': 'bll8iq97cem8',
             "DS": isSr ? this.getDs2() : this.getDs(),
             "Referer": "https://app.mihoyo.com",
             "x-rpc-sys_version": "12",
             //"Host": "api-takumi-record.mihoyo.com",
-            "User-Agent": "okhttp/4.8.0",
+            "User-Agent": "okhttp/4.9.3",
         }
     }
 }
