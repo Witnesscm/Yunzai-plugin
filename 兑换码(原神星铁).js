@@ -7,7 +7,9 @@ import fetch from 'node-fetch'
 */
 
 //群号
-const groupList = [881061717, 567690505, 674398981]
+const groupList = [123456, 456789]
+//推送时间
+const pushTime = '0 0 11,21 * * ?'
 
 export class exchange extends plugin {
     constructor() {
@@ -33,7 +35,7 @@ export class exchange extends plugin {
         this.srUid = '288909600'
 
         this.task = {
-            cron: '0 0 11,21 * * ?',
+            cron: pushTime,
             name: '兑换码推送任务',
             fnc: () => this.exchangeTask(),
         }
