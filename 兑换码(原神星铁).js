@@ -225,7 +225,7 @@ export class exchangeCode extends plugin {
             e.group = e.bot.pickGroup(Number(groupId))
             e.group_id = Number(groupId)
             let tmp = await common.makeForwardMsg(e, msg, msg[0])
-            if (!tmp) return
+            if (!tmp) tmp = msg.join('\n')
             await e.group.sendMsg(`本次前瞻直播兑换码将于${formatDate(deadline)}失效，记得尽快兑换哦~`)
             await common.sleep(2000)
             await e.group.sendMsg(tmp)
