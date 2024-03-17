@@ -1,19 +1,20 @@
 import common from '../../lib/common/common.js'
 import fetch from 'node-fetch'
+import fs from "fs"
+import YAML from 'yaml'
+import lodash from 'lodash'
 
 /**
  * 原神&星穹铁道前瞻直播兑换码推送
  * 默认在直播当天晚上9点以及次日早上11点推送两次
  */
 
-const cfg = {
-  /** 推送时间 */
+const defCfg = {
   pushTime: '0 0 11,21 * * ?',
-  /** 群号 */
-  groupList: [123456, 456789]
+  groupList: []
 }
 
-export class exchange extends plugin {
+export class exchangeCode extends plugin {
   constructor() {
     super({
       name: '原神|星铁兑换码',
@@ -26,6 +27,10 @@ export class exchange extends plugin {
           fnc: 'code'
         },
         {
+          reg: '^#*(开启|关闭)兑换码推送$',
+          fnc: 'setPush'
+        },
+        {
           reg: '^#兑换码推送$',
           permission: 'master',
           fnc: 'exchangeTask'
@@ -33,40 +38,62 @@ export class exchange extends plugin {
       ]
     })
 
+    this.path = './plugins/example/config'
+    this.file = this.path + '/exchange.yaml'
     this.Uids = {
       gs: [75276550],
       sr: [288909600, 80823548]
     }
 
     this.task = {
-      cron: cfg.pushTime,
+      cron: this.getConfig().pushTime,
       name: '兑换码推送任务',
       fnc: () => this.exchangeTask(),
     }
   }
 
+  async init () {
+    if (!fs.existsSync(this.path)) {
+      fs.mkdirSync(this.path)
+    }
+    
+    if (!fs.existsSync(this.file)) {
+      fs.writeFileSync(this.file, YAML.stringify(defCfg), 'utf-8')
+    }
+  }
+
+  getConfig() {
+    let cfg
+    try {
+      cfg = YAML.parse(fs.readFileSync(this.file, 'utf8'))
+    } catch (err) {
+      cfg = defCfg
+    }
+    return cfg
+  }
+
   async code() {
-    const actId = await this.getActIdByGame(this.e.isSr ? 'sr' : 'gs')
+    const actId = await this.getActIdByGame(this.e.game)
     if (!actId) {
       logger.info('[兑换码] 未获取到actId')
       await this.reply(`暂无${this.e.isSr ? '星穹铁道' : '原神'}直播兑换码`)
       return false
     }
 
-    const { codes, title, deadline } = await this.getCode(actId)
+    const { codes, title, deadline } = await this.getCode(actId, this.e.game)
     if (!codes) {
       return await this.reply(`暂无${this.e.isSr ? '星穹铁道' : '原神'}直播兑换码`)
     }
 
     let msg = [`${title}-直播兑换码`, ...codes]
     if (deadline) {
-      msg.splice(1, 0, `兑换码过期时间: \n${deadline.getFullYear()}年${deadline.getMonth() + 1}月${deadline.getDate()}日 12:00:00`)
+      msg.splice(1, 0, `兑换码过期时间: \n${formatDate(deadline, true)}`)
     }
     msg = await common.makeForwardMsg(this.e, msg, msg[0])
     await this.reply(msg)
   }
 
-  async getCode(actId) {
+  async getCode(actId, game = 'gs') {
     this.actId = actId
     this.now = parseInt(Date.now() / 1000)
 
@@ -81,7 +108,11 @@ export class exchange extends plugin {
     //截止日期第二天中午12点
     let deadline = new Date(index_data['start'])
     deadline.setDate(deadline.getDate() + 1)
-    deadline.setHours(12, 0, 0, 0)
+    if (game == 'gs') {
+      deadline.setHours(12, 0, 0)
+    } else {
+      deadline.setHours(23, 59, 59)
+    }
 
     let code = await this.getData('code')
     if (!code || !code.data?.code_list) {
@@ -166,6 +197,7 @@ export class exchange extends plugin {
 
   async exchangeTask() {
     logger.mark('[兑换码推送] 开始检测直播兑换码')
+    let cfg = this.getConfig()
     if (cfg.groupList.length <= 0) {
       logger.mark('[兑换码推送] 未设置推送群号')
       return
@@ -173,12 +205,12 @@ export class exchange extends plugin {
     for (const game of ['gs', 'sr']) {
       const actId = await this.getActIdByGame(game)
       if (actId) {
-        const { codes, title, deadline } = await this.getCode(actId)
+        const { codes, title, deadline } = await this.getCode(actId, game)
         if (!codes || codes.length === 0) continue
         const now = new Date()
         const diff = deadline.getTime() - now.getTime()
         const diffInHours = diff / (1000 * 60 * 60)
-        if (diffInHours < 24 && diffInHours > 0) {
+        if (diffInHours > 0) {
           logger.mark('[兑换码推送] 检测到直播兑换码，开始推送...')
           let msg = [`${title}-直播兑换码`, ...codes]
           let e = {
@@ -194,7 +226,7 @@ export class exchange extends plugin {
             e.group_id = Number(groupId)
             let tmp = await common.makeForwardMsg(e, msg, msg[0])
             if (!tmp) return
-            await e.group.sendMsg(`本次前瞻直播兑换码将于${deadline.getMonth() + 1}月${deadline.getDate()}日12:00:00失效，记得尽快兑换哦~`)
+            await e.group.sendMsg(`本次前瞻直播兑换码将于${formatDate(deadline)}失效，记得尽快兑换哦~`)
             await common.sleep(2000)
             await e.group.sendMsg(tmp)
             await common.sleep(10000)
@@ -204,4 +236,46 @@ export class exchange extends plugin {
       await common.sleep(10000)
     }
   }
+
+  async setPush() {
+    if (!this.e.isGroup) {
+      await this.reply('请在群聊中设置推送')
+      return
+    }
+    if (!this.e.member?.is_admin && !this.e.isMaster) {
+      await this.reply('暂无权限，只有管理员才能操作', true)
+      return true
+    }
+
+    let cfg = this.getConfig()
+
+    let model
+    let msg = `原神&星穹铁道兑换码推送已`
+    if (this.e.msg.includes('开启')) {
+      model = '开启'
+      cfg.groupList.push(this.e.group_id)
+      cfg.groupList = lodash.uniq(cfg.groupList)
+      msg += `${model}\n如有最新前瞻直播兑换码将自动推送至此`
+    } else {
+      model = '关闭'
+      msg += `${model}`
+      cfg.groupList = lodash.difference(cfg.groupList, [this.e.group_id])
+    }
+
+    fs.writeFileSync(this.file, YAML.stringify(cfg), 'utf8')
+
+    logger.mark(`${this.e.logFnc} ${model}前瞻直播兑换码推送：${this.e.group_id}`)
+    await this.reply(msg)
+  }
+}
+
+function formatDate(date, includeYear = false) {
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  const seconds = date.getSeconds().toString().padStart(2, '0')
+
+  return `${includeYear ? `${year}年` : ''}${month}月${day}日${hours}:${minutes}:${seconds}`
 }
